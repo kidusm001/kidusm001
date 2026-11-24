@@ -1,8 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="420" height="148" viewBox="0 0 420 148">
-  <rect width="420" height="148" fill="#FFFFFF"/>
-  <rect x="16" y="6" width="398" height="134" rx="10" fill="#F6F7F8"/>
-  <text x="38" y="37" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="18" font-weight="650" letter-spacing="-0.3" fill="#111418">bex</text>
-  <text x="392" y="36.5" text-anchor="end" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500" fill="#246B5C">Linux  ↗</text>
-  <text x="38" y="63" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="13.2" fill="#454D57">Daemonless, rootless native Linux</text><text x="38" y="82" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="13.2" fill="#454D57">performance monitor with live CPU, memory,</text><text x="38" y="101" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="13.2" fill="#454D57">disk, network, thermal, and process views.</text>
-  <text x="38" y="123" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="10.5" fill="#636C77">C++20 · Qt 6 · CMake  ·  11 Qt test suites</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="128" viewBox="0 0 840 128">
+  <rect width="840" height="128" fill="#FFFFFF"/>
+  <rect x="16" y="5" width="808" height="116" rx="10" fill="#F6F7F8"/>
+  <text x="38" y="35" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="18" font-weight="650" letter-spacing="-0.3" fill="#111418">bex</text>
+  <text x="84" y="34.5" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="11" fill="#636C77">kidusm001/bex</text>
+  <text x="802" y="34.5" text-anchor="end" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500" fill="#246B5C">Linux  ↗</text>
+  <text x="38" y="61" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="13.5" fill="#454D57">Daemonless, rootless native Linux performance monitor built with C++20 and Qt 6, rendering live CPU,</text>
+  <text x="38" y="80" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="13.5" fill="#454D57">memory, disk, network, thermal, and process views with real-time filtering and process classification.</text>
+  <text x="38" y="105" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="10.8" fill="#636C77">C++20 · Qt 6 · CMake  ·  11 automated Qt test suites</text>
 </svg>

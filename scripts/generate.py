@@ -152,25 +152,26 @@ def small_hex_points(cx: float, cy: float, r: float) -> str:
     return " ".join(pts)
 
 
-def hex_prism_svg(cx, cy_base, rx, ry, h, colors, stroke_col, stroke_op="0.65", is_wire=False, strata=False) -> str:
-    def ring(y):
-        return [
-            (cx + rx, y),
-            (cx + rx * 0.5, y + ry),
-            (cx - rx * 0.5, y + ry),
-            (cx - rx, y),
-            (cx - rx * 0.5, y - ry),
-            (cx + rx * 0.5, y - ry),
-        ]
+def hex_ring(cx: float, y: float, rx: float, ry: float):
+    return [
+        (cx + rx, y),
+        (cx + rx * 0.5, y + ry),
+        (cx - rx * 0.5, y + ry),
+        (cx - rx, y),
+        (cx - rx * 0.5, y - ry),
+        (cx + rx * 0.5, y - ry),
+    ]
 
+
+def hex_prism_svg(cx, cy_base, rx, ry, h, colors, stroke_col, stroke_op="0.65", is_wire=False, strata=False) -> str:
     if is_wire or h <= 0.5:
-        pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in ring(cy_base))
+        pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in hex_ring(cx, cy_base, rx, ry))
         return f'<polygon points="{pts}" fill="none" stroke="{colors}" stroke-width="0.72" opacity="0.72"/>'
 
     top_col, fl_col, fc_col, fr_col = colors
     y_top = cy_base - h
-    b = ring(cy_base)
-    u = ring(y_top)
+    b = hex_ring(cx, cy_base, rx, ry)
+    u = hex_ring(cx, y_top, rx, ry)
 
     def poly(points, fill, sw="0.5"):
         p = " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
@@ -187,7 +188,7 @@ def hex_prism_svg(cx, cy_base, rx, ry, h, colors, stroke_col, stroke_op="0.65", 
         step = 13.0
         cur_y = y_top + step
         while cur_y < cy_base - 6:
-            s = ring(cur_y)
+            s = hex_ring(cx, cur_y, rx, ry)
             d = f"M {s[3][0]:.1f},{s[3][1]:.1f} L {s[2][0]:.1f},{s[2][1]:.1f} L {s[1][0]:.1f},{s[1][1]:.1f} L {s[0][0]:.1f},{s[0][1]:.1f}"
             out.append(f'<path d="{d}" fill="none" stroke="{stroke_col}" stroke-width="0.45" opacity="0.20"/>')
             cur_y += step
@@ -195,8 +196,29 @@ def hex_prism_svg(cx, cy_base, rx, ry, h, colors, stroke_col, stroke_op="0.65", 
     return "".join(out)
 
 
+def hex_socket_clip(clip_id: str, cx: float, cy_base: float, rx: float, ry: float, h: float) -> str:
+    """
+    Exact hydraulic-piston clip polygon pinned to the prism's front-bottom hexagonal edge on the plinth.
+    When the prism translates from translateY(h) -> translateY(0), its top hex cap starts 100% flush
+    with the plinth at height 0 and extrudes cleanly upward with zero overhang below the plinth.
+    """
+    b = hex_ring(cx, cy_base, rx + 0.6, ry + 0.5)
+    top_y = cy_base - h - 20.0
+    pts = [
+        (b[3][0], top_y),
+        (b[0][0], top_y),
+        b[0],
+        b[1],
+        b[2],
+        b[3],
+    ]
+    p = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+    return f'<clipPath id="{clip_id}"><polygon points="{p}"/></clipPath>'
+
+
 def make_header(t, suffix):
     emblem = []
+    clips = []
     erx, ery = 19.5, 10.4
     cluster = [
         (0, -1, 20, t["hex_low"], False),
@@ -213,50 +235,68 @@ def make_header(t, suffix):
         py = 96 + (r + q * 0.5) * (ery * 2.04)
         placed.append((py, px, h, cols, strata))
     placed.sort(key=lambda item: item[0])
-    for py, px, h, cols, strata in placed:
-        emblem.append(hex_prism_svg(px, py, erx, ery, h, cols, t["hex_stroke"], t["hex_stroke_op"], strata=strata))
+    for idx, (py, px, h, cols, strata) in enumerate(placed):
+        cid = f"hc-{idx}"
+        clips.append(hex_socket_clip(cid, px, py, erx, ery, h))
+        el = hex_prism_svg(px, py, erx, ery, h, cols, t["hex_stroke"], t["hex_stroke_op"], strata=strata)
+        emblem.append(
+            f'<g clip-path="url(#{cid})">'
+            f'<g class="h-grow" style="--h:{h:.1f}px;animation-delay:{60 + idx * 55}ms">{el}</g>'
+            f'</g>'
+        )
 
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="148" viewBox="0 0 840 148">
-  <rect width="840" height="148" fill="{t['canvas']}"/>
-  <text x="16" y="54" font-family="{FONT_SANS}" font-size="34" font-weight="700" letter-spacing="-0.8" fill="{t['ink']}">Kidus Mesfin Mekuria</text>
-  <text x="16" y="86" font-family="{FONT_SANS}" font-size="15.5" fill="{t['ink_mid']}">Software engineer building full-stack applications and systems software.</text>
-  <text x="16" y="114" font-family="{FONT_SANS}" font-size="13" fill="{t['ink_dim']}">Python  ·  TypeScript  ·  Kotlin  ·  C++  ·  Addis Ababa</text>
+    anim = """
+  <style>
+    @keyframes hGrow {
+      0% { transform: translateY(var(--h)); }
+      100% { transform: translateY(0); }
+    }
+    .h-grow {
+      animation: hGrow 750ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .h-grow { animation: none !important; transform: none !important; }
+    }
+  </style>
+"""
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="142" viewBox="0 0 840 142">
+  {anim}
+  <defs>{''.join(clips)}</defs>
+  <rect width="840" height="142" fill="{t['canvas']}"/>
+  <text x="16" y="50" font-family="{FONT_SANS}" font-size="34" font-weight="700" letter-spacing="-0.8" fill="{t['ink']}">Kidus Mesfin Mekuria</text>
+  <text x="16" y="82" font-family="{FONT_SANS}" font-size="15.5" fill="{t['ink_mid']}">Software engineer building full-stack applications and systems software.</text>
+  <text x="16" y="110" font-family="{FONT_SANS}" font-size="13" fill="{t['ink_dim']}">Python  ·  TypeScript  ·  Kotlin  ·  C++  ·  Addis Ababa</text>
   {''.join(emblem)}
 </svg>
 """
     (ASSETS_DIR / f"header-{suffix}.svg").write_text(svg)
 
 
-def make_social_icon_btn(t, suffix, name, icon_svg, slice_w, bx, bw, is_first=False, fill_icon=False):
-    ix = bx + (bw - 18) / 2
-    iy = 4 + (36 - 18) / 2
+def make_social_icon(t, suffix, name, icon_svg, fill_icon=False):
+    # Clean standalone 42x36 clickable icon button (fixed pixel width in README — never breaks on GitHub!)
     g_attrs = (
         f'fill="{t["ink"]}" stroke="none"'
         if fill_icon
         else f'fill="none" stroke="{t["ink"]}" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"'
     )
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{slice_w}" height="54" viewBox="0 0 {slice_w} 54">
-  <rect width="{slice_w}" height="54" fill="{t['canvas']}"/>
-  <rect x="{bx}" y="4" width="{bw}" height="36" rx="9" fill="{t['surface']}" stroke="{t['rule']}"/>
-  <g transform="translate({ix:.1f}, {iy:.1f})" {g_attrs}>
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="42" height="36" viewBox="0 0 42 36">
+  <rect x="0.5" y="0.5" width="41" height="35" rx="9" fill="{t['surface']}" stroke="{t['rule']}"/>
+  <g transform="translate(12, 9)" {g_attrs}>
     {icon_svg}
   </g>
-  <line x1="{16 if is_first else 0}" y1="53.5" x2="{slice_w}" y2="53.5" stroke="{t['rule']}"/>
 </svg>
 """
     (ASSETS_DIR / f"social-{name}-{suffix}.svg").write_text(svg)
 
 
-def make_social_spacer(t, suffix, slice_w):
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{slice_w}" height="54" viewBox="0 0 {slice_w} 54">
-  <rect width="{slice_w}" height="54" fill="{t['canvas']}"/>
-  <line x1="0" y1="53.5" x2="{slice_w - 16}" y2="53.5" stroke="{t['rule']}"/>
-</svg>
-"""
-    (ASSETS_DIR / f"social-spacer-{suffix}.svg").write_text(svg)
-
-
-def make_hex_terrain(t, suffix, stats):
+def make_terrain_and_stats(t, suffix, stats):
+    """
+    Unified 840x430 SVG containing:
+    1) Calm 3D Isometric Hex Terrain where every single column smoothly EXTRUDES UPWARD
+       from height 0 flush on its own plinth socket (zero downward overhang, zero broken pieces!)
+    2) Grounded Contributions plaque directly below the terrain (zero seam between them!).
+    """
     grid = stats["daily_grid"]
     n_weeks = len(grid)
     max_day = max(stats["max_day"], 1)
@@ -270,7 +310,7 @@ def make_hex_terrain(t, suffix, stats):
     high_threshold = max(int(max_day * 0.45), 12)
 
     rx, ry = 7.4, 4.15
-    ox, oy = 104.0, 128.0
+    ox, oy = 104.0, 140.0
     dx_w, dy_w = 13.7, 1.90
     dx_d, dy_d = -11.0, 7.6
 
@@ -325,15 +365,24 @@ def make_hex_terrain(t, suffix, stats):
                     summit_xy = (sx, sy - h)
 
     prisms.sort(key=lambda item: (item[0], item[1]))
+    clips = []
     terrain_svg = []
+    clip_idx = 0
     for sy, sx, w_idx, h, cols, wire, strata in prisms:
         el = hex_prism_svg(sx, sy, rx, ry, h, cols, t["hex_stroke"], t["hex_stroke_op"], is_wire=wire, strata=strata)
         if wire:
             terrain_svg.append(el)
         else:
-            delay_ms = 40 + w_idx * 14
-            cls = "hex-col hex-peak" if cols == t["hex_peak"] else "hex-col"
-            terrain_svg.append(f'<g class="{cls}" style="animation-delay:{delay_ms}ms">{el}</g>')
+            cid = f"c{clip_idx}"
+            clip_idx += 1
+            clips.append(hex_socket_clip(cid, sx, sy, rx, ry, h))
+            # Smooth cascading left-to-right hydraulic extrusion (18ms per week, 850ms cubic ease-out)
+            delay_ms = 80 + w_idx * 18
+            terrain_svg.append(
+                f'<g clip-path="url(#{cid})">'
+                f'<g class="hex-grow" style="--h:{h:.1f}px;animation-delay:{delay_ms}ms">{el}</g>'
+                f'</g>'
+            )
 
     callout = ""
     if summit_xy:
@@ -352,34 +401,33 @@ def make_hex_terrain(t, suffix, stats):
 
     anim_style = """
   <style>
-    @keyframes hexRise {
-      0% { transform: translateY(10px); }
+    @keyframes hexGrow {
+      0% { transform: translateY(var(--h)); }
       100% { transform: translateY(0); }
     }
-    @keyframes peakBreathe {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-2.4px); }
+    @keyframes calloutIn {
+      0% { opacity: 0; transform: translateY(6px); }
+      100% { opacity: 1; transform: translateY(0); }
     }
     @keyframes summitPulse {
       0%, 100% { opacity: 0.14; transform: scale(0.85); }
-      50% { opacity: 0.55; transform: scale(1.3); }
+      50% { opacity: 0.55; transform: scale(1.32); }
     }
-    .hex-col {
-      animation: hexRise 580ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    .hex-grow {
+      animation: hexGrow 850ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }
-    .hex-peak {
-      animation:
-        hexRise 580ms cubic-bezier(0.16, 1, 0.3, 1) both,
-        peakBreathe 4.6s ease-in-out 1.4s infinite;
+    .summit-callout {
+      animation: calloutIn 480ms cubic-bezier(0.22, 1, 0.36, 1) 1450ms both;
     }
     .summit-ring {
       transform-box: fill-box;
       transform-origin: center;
-      animation: summitPulse 3.6s ease-in-out infinite;
+      animation: summitPulse 3.6s ease-in-out 1900ms infinite;
     }
     @media (prefers-reduced-motion: reduce) {
-      .hex-col, .hex-peak, .summit-ring {
+      .hex-grow, .summit-callout, .summit-ring {
         animation: none !important;
+        opacity: 1 !important;
         transform: none !important;
       }
       .summit-ring { opacity: 0.25 !important; }
@@ -397,30 +445,15 @@ def make_hex_terrain(t, suffix, stats):
     leg = []
     lx = 16
     for col, txt, is_w in legend_items:
-        pts = small_hex_points(lx + 5, 316.5, 4.6)
+        pts = small_hex_points(lx + 5, 326.5, 4.6)
         if is_w:
             leg.append(f'<polygon points="{pts}" fill="none" stroke="{col}" stroke-width="1.1"/>')
         else:
             leg.append(f'<polygon points="{pts}" fill="{col}"/>')
-        leg.append(f'<text x="{lx + 14}" y="320" font-family="{FONT_SANS}" font-size="10.5" fill="{t["ink_dim"]}">{txt}</text>')
+        leg.append(f'<text x="{lx + 14}" y="330" font-family="{FONT_SANS}" font-size="10.5" fill="{t["ink_dim"]}">{txt}</text>')
         lx += 48 if txt != "Peak" else 56
 
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="334" viewBox="0 0 840 334">
-  {anim_style}
-  <rect width="840" height="334" fill="{t['canvas']}"/>
-  <text x="16" y="34" font-family="{FONT_SANS}" font-size="16" font-weight="600" letter-spacing="-0.2" fill="{t['ink']}">Commit terrain</text>
-  <text x="824" y="34" text-anchor="end" font-family="{FONT_SANS}" font-size="12" fill="{t['ink_dim']}">52 completed weeks · updated daily</text>
-  {plinth}
-  {''.join(terrain_svg)}
-  {callout}
-  {''.join(leg)}
-  <text x="824" y="320" text-anchor="end" font-family="{FONT_SANS}" font-size="10.5" fill="{t['ink_dim']}">52 weeks ago → last week</text>
-</svg>
-"""
-    (ASSETS_DIR / f"hex-terrain-{suffix}.svg").write_text(svg)
-
-
-def make_contributions_strip(t, suffix, stats):
+    # Contributions plaque integrated cleanly right below the legend (y=350..416)
     items = [
         (f"{stats['total_contribs']:,}", "contributions"),
         (f"{stats['merged_prs']:,}", "merged PRs"),
@@ -430,19 +463,30 @@ def make_contributions_strip(t, suffix, stats):
     cols_svg = []
     for i, (val, lbl) in enumerate(items):
         x = 248 + i * 148
-        cols_svg.append(f'<line x1="{x - 20}" y1="20" x2="{x - 20}" y2="58" stroke="{t["rule"]}"/>')
-        cols_svg.append(f'<text x="{x}" y="39" font-family="{FONT_MONO}" font-size="20" font-weight="700" fill="{t["ink"]}">{val}</text>')
-        cols_svg.append(f'<text x="{x}" y="56" font-family="{FONT_SANS}" font-size="11.5" fill="{t["ink_dim"]}">{lbl}</text>')
+        cols_svg.append(f'<line x1="{x - 20}" y1="364" x2="{x - 20}" y2="402" stroke="{t["rule"]}"/>')
+        cols_svg.append(f'<text x="{x}" y="383" font-family="{FONT_MONO}" font-size="20" font-weight="700" fill="{t["ink"]}">{val}</text>')
+        cols_svg.append(f'<text x="{x}" y="400" font-family="{FONT_SANS}" font-size="11.5" fill="{t["ink_dim"]}">{lbl}</text>')
 
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="86" viewBox="0 0 840 86">
-  <rect width="840" height="86" fill="{t['canvas']}"/>
-  <rect x="16" y="8" width="808" height="66" rx="10" fill="{t['surface']}"/>
-  <text x="38" y="39" font-family="{FONT_MONO}" font-size="16" font-weight="700" fill="{t['ink']}">{stats['start_year']} – {stats['cur_year']}</text>
-  <text x="38" y="56" font-family="{FONT_SANS}" font-size="11.5" fill="{t['ink_dim']}">{stats['active_years']} active years on GitHub</text>
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="430" viewBox="0 0 840 430">
+  {anim_style}
+  <defs>{''.join(clips)}</defs>
+  <rect width="840" height="430" fill="{t['canvas']}"/>
+  <line x1="16" y1="0.5" x2="824" y2="0.5" stroke="{t['rule']}"/>
+  <text x="16" y="38" font-family="{FONT_SANS}" font-size="16" font-weight="600" letter-spacing="-0.2" fill="{t['ink']}">Commit terrain</text>
+  <text x="824" y="38" text-anchor="end" font-family="{FONT_SANS}" font-size="12" fill="{t['ink_dim']}">52 completed weeks · updated daily</text>
+  {plinth}
+  {''.join(terrain_svg)}
+  {callout}
+  {''.join(leg)}
+  <text x="824" y="330" text-anchor="end" font-family="{FONT_SANS}" font-size="10.5" fill="{t['ink_dim']}">52 weeks ago → last week</text>
+  <!-- Grounded Contributions Plaque directly beneath the terrain -->
+  <rect x="16" y="352" width="808" height="66" rx="10" fill="{t['surface']}"/>
+  <text x="38" y="383" font-family="{FONT_MONO}" font-size="16" font-weight="700" fill="{t['ink']}">{stats['start_year']} – {stats['cur_year']}</text>
+  <text x="38" y="400" font-family="{FONT_SANS}" font-size="11.5" fill="{t['ink_dim']}">{stats['active_years']} active years on GitHub</text>
   {''.join(cols_svg)}
 </svg>
 """
-    (ASSETS_DIR / f"stats-{suffix}.svg").write_text(svg)
+    (ASSETS_DIR / f"terrain-{suffix}.svg").write_text(svg)
 
 
 def make_section_title(t, suffix, name, title, right_note):
@@ -456,63 +500,49 @@ def make_section_title(t, suffix, name, title, right_note):
     (ASSETS_DIR / f"sec-{name}-{suffix}.svg").write_text(svg)
 
 
-def make_hero_project(t, suffix, stats):
-    tag = stats["rebuild_tag"]
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="134" viewBox="0 0 840 134">
-  <rect width="840" height="134" fill="{t['canvas']}"/>
-  <rect x="16" y="6" width="808" height="120" rx="10" fill="{t['surface']}"/>
-  <text x="38" y="37" font-family="{FONT_SANS}" font-size="18.5" font-weight="650" letter-spacing="-0.3" fill="{t['ink']}">Rebuild</text>
-  <text x="115" y="36.5" font-family="{FONT_MONO}" font-size="11" fill="{t['ink_dim']}">{USERNAME}/rebuild-android</text>
-  <text x="802" y="36.5" text-anchor="end" font-family="{FONT_SANS}" font-size="12" font-weight="500" fill="{t['accent']}">Android · {escape(tag)}  ↗</text>
-  <text x="38" y="63" font-family="{FONT_SANS}" font-size="13.5" fill="{t['ink_mid']}">Offline-first Android strength-training logbook with transactional SQLite snapshots, pure immutable state,</text>
-  <text x="38" y="82" font-family="{FONT_SANS}" font-size="13.5" fill="{t['ink_mid']}">additive schema migrations, and Perfetto-profiled Compose UI (193ms → 40ms tab switch).</text>
-  <text x="38" y="109" font-family="{FONT_MONO}" font-size="10.8" fill="{t['ink_dim']}">Kotlin · Jetpack Compose · SQLite  ·  340+ JVM/Robolectric tests</text>
-</svg>
-"""
-    (ASSETS_DIR / f"proj-rebuild-{suffix}.svg").write_text(svg)
-
-
-def make_half_project(t, suffix, filename, title, tag, lines, meta, side="left"):
-    px = 16 if side == "left" else 6
-    pw = 398
-    body = "".join(
-        f'<text x="{px + 22}" y="{63 + i * 19}" font-family="{FONT_SANS}" font-size="13.2" fill="{t["ink_mid"]}">{escape(l)}</text>'
-        for i, l in enumerate(lines)
-    )
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="420" height="148" viewBox="0 0 420 148">
-  <rect width="420" height="148" fill="{t['canvas']}"/>
-  <rect x="{px}" y="6" width="{pw}" height="134" rx="10" fill="{t['surface']}"/>
-  <text x="{px + 22}" y="37" font-family="{FONT_SANS}" font-size="18" font-weight="650" letter-spacing="-0.3" fill="{t['ink']}">{escape(title)}</text>
-  <text x="{px + pw - 22}" y="36.5" text-anchor="end" font-family="{FONT_SANS}" font-size="12" font-weight="500" fill="{t['accent']}">{escape(tag)}  ↗</text>
-  {body}
-  <text x="{px + 22}" y="123" font-family="{FONT_MONO}" font-size="10.5" fill="{t['ink_dim']}">{escape(meta)}</text>
+def make_project_card(t, suffix, filename, title, slug, tag, line1, line2, meta):
+    # Full-width 840px card (width="100%" in README — ZERO GitHub <themed-picture> side-by-side breakage!)
+    slug_x = 38 + len(title) * 11.2 + 12
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="128" viewBox="0 0 840 128">
+  <rect width="840" height="128" fill="{t['canvas']}"/>
+  <rect x="16" y="5" width="808" height="116" rx="10" fill="{t['surface']}"/>
+  <text x="38" y="35" font-family="{FONT_SANS}" font-size="18" font-weight="650" letter-spacing="-0.3" fill="{t['ink']}">{escape(title)}</text>
+  <text x="{slug_x:.0f}" y="34.5" font-family="{FONT_MONO}" font-size="11" fill="{t['ink_dim']}">{escape(slug)}</text>
+  <text x="802" y="34.5" text-anchor="end" font-family="{FONT_SANS}" font-size="12" font-weight="500" fill="{t['accent']}">{escape(tag)}  ↗</text>
+  <text x="38" y="61" font-family="{FONT_SANS}" font-size="13.5" fill="{t['ink_mid']}">{escape(line1)}</text>
+  <text x="38" y="80" font-family="{FONT_SANS}" font-size="13.5" fill="{t['ink_mid']}">{escape(line2)}</text>
+  <text x="38" y="105" font-family="{FONT_MONO}" font-size="10.8" fill="{t['ink_dim']}">{escape(meta)}</text>
 </svg>
 """
     (ASSETS_DIR / f"{filename}-{suffix}.svg").write_text(svg)
 
 
 def make_stack(t, suffix):
+    # Unified Core stack heading + 2x2 matrix in one seamless 840px SVG
     rows = [
         ("Languages", "Python · TypeScript · Kotlin · C/C++ · SQL · C#",
          "Backend & Data", "Frappe/ERPNext · FastAPI · Node.js · PostgreSQL · SQLite · Redis"),
         ("Frontend & Mobile", "Next.js · React · Tailwind CSS · Jetpack Compose · Qt 6",
          "Infrastructure", "Linux · Docker · Kubernetes · Git · GitHub Actions"),
     ]
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="114" viewBox="0 0 840 114">
-  <rect width="840" height="114" fill="{t['canvas']}"/>
-  <text x="16" y="22" font-family="{FONT_SANS}" font-size="11.5" font-weight="600" fill="{t['ink_dim']}">{escape(rows[0][0])}</text>
-  <text x="16" y="42" font-family="{FONT_SANS}" font-size="13.2" fill="{t['ink']}">{escape(rows[0][1])}</text>
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="840" height="162" viewBox="0 0 840 162">
+  <rect width="840" height="162" fill="{t['canvas']}"/>
+  <line x1="16" y1="8.5" x2="824" y2="8.5" stroke="{t['rule']}"/>
+  <text x="16" y="36" font-family="{FONT_SANS}" font-size="16" font-weight="600" letter-spacing="-0.2" fill="{t['ink']}">Core stack</text>
 
-  <text x="384" y="22" font-family="{FONT_SANS}" font-size="11.5" font-weight="600" fill="{t['ink_dim']}">{escape(rows[0][2])}</text>
-  <text x="384" y="42" font-family="{FONT_SANS}" font-size="13.2" fill="{t['ink']}">{escape(rows[0][3])}</text>
+  <text x="16" y="68" font-family="{FONT_SANS}" font-size="11.5" font-weight="600" fill="{t['ink_dim']}">{escape(rows[0][0])}</text>
+  <text x="16" y="88" font-family="{FONT_SANS}" font-size="13.2" fill="{t['ink']}">{escape(rows[0][1])}</text>
 
-  <line x1="16" y1="58.5" x2="824" y2="58.5" stroke="{t['rule']}"/>
+  <text x="384" y="68" font-family="{FONT_SANS}" font-size="11.5" font-weight="600" fill="{t['ink_dim']}">{escape(rows[0][2])}</text>
+  <text x="384" y="88" font-family="{FONT_SANS}" font-size="13.2" fill="{t['ink']}">{escape(rows[0][3])}</text>
 
-  <text x="16" y="78" font-family="{FONT_SANS}" font-size="11.5" font-weight="600" fill="{t['ink_dim']}">{escape(rows[1][0])}</text>
-  <text x="16" y="98" font-family="{FONT_SANS}" font-size="13.2" fill="{t['ink']}">{escape(rows[1][1])}</text>
+  <line x1="16" y1="104.5" x2="824" y2="104.5" stroke="{t['rule']}"/>
 
-  <text x="384" y="78" font-family="{FONT_SANS}" font-size="11.5" font-weight="600" fill="{t['ink_dim']}">{escape(rows[1][2])}</text>
-  <text x="384" y="98" font-family="{FONT_SANS}" font-size="13.2" fill="{t['ink']}">{escape(rows[1][3])}</text>
+  <text x="16" y="124" font-family="{FONT_SANS}" font-size="11.5" font-weight="600" fill="{t['ink_dim']}">{escape(rows[1][0])}</text>
+  <text x="16" y="144" font-family="{FONT_SANS}" font-size="13.2" fill="{t['ink']}">{escape(rows[1][1])}</text>
+
+  <text x="384" y="124" font-family="{FONT_SANS}" font-size="11.5" font-weight="600" fill="{t['ink_dim']}">{escape(rows[1][2])}</text>
+  <text x="384" y="144" font-family="{FONT_SANS}" font-size="13.2" fill="{t['ink']}">{escape(rows[1][3])}</text>
 </svg>
 """
     (ASSETS_DIR / f"stack-{suffix}.svg").write_text(svg)
@@ -523,7 +553,7 @@ def picture_tag(base_name: str, alt: str, width: str = "100%") -> str:
         f'<picture>'
         f'<source media="(prefers-color-scheme: dark)" srcset="./assets/{base_name}-dark.svg">'
         f'<source media="(prefers-color-scheme: light)" srcset="./assets/{base_name}-light.svg">'
-        f'<img src="./assets/{base_name}-dark.svg" alt="{escape(alt)}" width="{width}" align="top">'
+        f'<img src="./assets/{base_name}-dark.svg" alt="{escape(alt)}" width="{width}">'
         f'</picture>'
     )
 
@@ -531,54 +561,60 @@ def picture_tag(base_name: str, alt: str, width: str = "100%") -> str:
 def main():
     stats = fetch_github_stats()
 
+    # Clean old unused sliced files if present
+    for old in list(ASSETS_DIR.glob("social-spacer-*.svg")) + list(ASSETS_DIR.glob("stats-*.svg")) + list(ASSETS_DIR.glob("hex-terrain-*.svg")) + list(ASSETS_DIR.glob("sec-stack-*.svg")):
+        old.unlink(missing_ok=True)
+
     icon_email = '<rect x="1" y="3.5" width="16" height="11" rx="2"/><path d="M1.8 4.8L9 10l7.2-5.2"/>'
     icon_tg = '<path d="M16.5 2L1.5 8.2l4.9 1.8 7.8-5.6-5.5 6.6v4.1l2.6-2.6 3.2 2.4L16.5 2z"/>'
     icon_x = '<path d="M2.5 2h3.5l3.6 5.1L14 2h1.7l-5.2 6.1L16.1 16h-3.5l-4-5.6L3.8 16H2.1l5.6-6.6L2.5 2z"/>'
 
     for suffix, t in THEMES.items():
         make_header(t, suffix)
-        make_social_icon_btn(t, suffix, "email", icon_email, 64, 16, 42, is_first=True)
-        make_social_icon_btn(t, suffix, "telegram", icon_tg, 50, 4, 42)
-        make_social_icon_btn(t, suffix, "x", icon_x, 50, 4, 42, fill_icon=True)
-        make_social_spacer(t, suffix, 676)
-        make_hex_terrain(t, suffix, stats)
-        make_contributions_strip(t, suffix, stats)
+        make_social_icon(t, suffix, "email", icon_email)
+        make_social_icon(t, suffix, "telegram", icon_tg)
+        make_social_icon(t, suffix, "x", icon_x, fill_icon=True)
+        make_terrain_and_stats(t, suffix, stats)
         make_section_title(t, suffix, "work", "Selected work", "Click any project to open")
-        make_hero_project(t, suffix, stats)
-        make_half_project(
-            t, suffix, "proj-bex", "bex", "Linux",
-            [
-                "Daemonless, rootless native Linux",
-                "performance monitor with live CPU, memory,",
-                "disk, network, thermal, and process views.",
-            ],
-            "C++20 · Qt 6 · CMake  ·  11 Qt test suites",
-            side="left",
+        make_project_card(
+            t, suffix, "proj-rebuild", "Rebuild", f"{USERNAME}/rebuild-android", f"Android · {stats['rebuild_tag']}",
+            "Offline-first Android strength-training app with transactional SQLite snapshots, pure immutable state,",
+            "additive schema migrations, and Perfetto-profiled Compose UI (193ms → 40ms tab switch).",
+            "Kotlin · Jetpack Compose · SQLite  ·  340+ JVM/Robolectric tests",
         )
-        make_half_project(
-            t, suffix, "proj-routegna", "RouteGna", "Web & API",
-            [
-                "Multi-tenant fleet, route optimization, and",
-                "automated payroll platform with 6-tier RBAC,",
-                "Redis caching, and containerized services.",
-            ],
-            "TypeScript · React · Node.js · PostgreSQL · FastAPI",
-            side="right",
+        make_project_card(
+            t, suffix, "proj-bex", "bex", f"{USERNAME}/bex", "Linux",
+            "Daemonless, rootless native Linux performance monitor built with C++20 and Qt 6, rendering live CPU,",
+            "memory, disk, network, thermal, and process views with real-time filtering and process classification.",
+            "C++20 · Qt 6 · CMake  ·  11 automated Qt test suites",
         )
-        make_section_title(t, suffix, "stack", "Core stack", "")
+        make_project_card(
+            t, suffix, "proj-routegna", "RouteGna", f"{USERNAME}/multi-fleet-managment", "Web & API",
+            "Multi-tenant fleet management, route optimization, and automated payroll SaaS platform with 6-tier RBAC,",
+            "Redis caching, scheduled cron payroll jobs, and containerized Node.js and FastAPI services.",
+            "TypeScript · React · Node.js · PostgreSQL · Redis · FastAPI · Docker",
+        )
         make_stack(t, suffix)
 
+    # Zero side-by-side % hacks that break inside GitHub <themed-picture>!
+    # Full-width sections use width="100%", social icon buttons use fixed pixel width="42"!
     readme = f"""<!-- profile:start -->
-<div align="center">
+<div align="left">
+
 {picture_tag("header", "Kidus Mesfin Mekuria — Software engineer building full-stack applications and systems software. Python, TypeScript, Kotlin, C++, Addis Ababa.")}
-<a href="mailto:kidusmesfin27@gmail.com">{picture_tag("social-email", "Email: kidusmesfin27@gmail.com", "7.61%")}</a><a href="https://t.me/crosscodething">{picture_tag("social-telegram", "Telegram: t.me/crosscodething", "5.95%")}</a><a href="https://x.com/kidus_m27">{picture_tag("social-x", "X: @kidus_m27", "5.95%")}</a>{picture_tag("social-spacer", "", "80.47%")}
-{picture_tag("hex-terrain", f"Commit terrain: 3D isometric hexagonal prism visualization of 52 completed weeks, peak {stats['max_day']}/day ({stats['peak_week']}/week), updated daily via GitHub Actions.")}
-{picture_tag("stats", f"{stats['start_year']}–{stats['cur_year']} on GitHub: {stats['total_contribs']} contributions, {stats['merged_prs']} merged PRs, {stats['active_weeks']} of {stats['total_weeks']} active weeks, {stats['owned_repos']} repositories.")}
+
+&nbsp;&nbsp;&nbsp;<a href="mailto:kidusmesfin27@gmail.com">{picture_tag("social-email", "Email: kidusmesfin27@gmail.com", "42")}</a>&nbsp;&nbsp;<a href="https://t.me/crosscodething">{picture_tag("social-telegram", "Telegram: t.me/crosscodething", "42")}</a>&nbsp;&nbsp;<a href="https://x.com/kidus_m27">{picture_tag("social-x", "X: @kidus_m27", "42")}</a>
+
+{picture_tag("terrain", f"Commit terrain: 3D isometric hexagonal prism visualization of 52 completed weeks, peak {stats['max_day']}/day ({stats['peak_week']}/week). {stats['start_year']}–{stats['cur_year']}: {stats['total_contribs']} contributions, {stats['merged_prs']} merged PRs, {stats['active_weeks']} of {stats['total_weeks']} active weeks, {stats['owned_repos']} repositories.")}
+
 {picture_tag("sec-work", "Selected work")}
-<a href="https://github.com/{USERNAME}/rebuild-android">{picture_tag("proj-rebuild", f"Rebuild ({USERNAME}/rebuild-android): Offline-first Android strength-training logbook in Kotlin, Jetpack Compose, and SQLite. 193ms to 40ms tab switch via Perfetto profiling, 340+ JVM/Robolectric tests, {stats['rebuild_tag']}.")}</a>
-<a href="https://github.com/{USERNAME}/bex">{picture_tag("proj-bex", f"bex ({USERNAME}/bex): Daemonless, rootless native Linux performance monitor in C++20 and Qt 6 with live CPU, memory, disk, network, thermal, and process views and 11 Qt test suites.", "50%")}</a><a href="https://github.com/{USERNAME}/multi-fleet-managment">{picture_tag("proj-routegna", f"RouteGna ({USERNAME}/multi-fleet-managment): Multi-tenant fleet, route optimization, and automated payroll platform in TypeScript, React, Node.js, PostgreSQL, Redis, Docker, and FastAPI.", "50%")}</a>
-{picture_tag("sec-stack", "Core stack")}
+
+<a href="https://github.com/{USERNAME}/rebuild-android">{picture_tag("proj-rebuild", f"Rebuild ({USERNAME}/rebuild-android): Offline-first Android strength-training app in Kotlin, Jetpack Compose, and SQLite. 193ms to 40ms tab switch via Perfetto profiling, 340+ JVM/Robolectric tests, {stats['rebuild_tag']}.")}</a>
+<a href="https://github.com/{USERNAME}/bex">{picture_tag("proj-bex", f"bex ({USERNAME}/bex): Daemonless, rootless native Linux performance monitor in C++20 and Qt 6 with live CPU, memory, disk, network, thermal, and process views and 11 Qt test suites.")}</a>
+<a href="https://github.com/{USERNAME}/multi-fleet-managment">{picture_tag("proj-routegna", f"RouteGna ({USERNAME}/multi-fleet-managment): Multi-tenant fleet, route optimization, and automated payroll platform in TypeScript, React, Node.js, PostgreSQL, Redis, Docker, and FastAPI.")}</a>
+
 {picture_tag("stack", "Core stack: Python, TypeScript, Kotlin, C/C++, SQL, C#, Frappe/ERPNext, FastAPI, Node.js, PostgreSQL, SQLite, Redis, Next.js, React, Tailwind CSS, Jetpack Compose, Qt 6, Linux, Docker, Kubernetes, Git, GitHub Actions.")}
+
 </div>
 <!-- profile:end -->
 """
