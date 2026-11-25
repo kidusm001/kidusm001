@@ -1,7 +1,7 @@
 <!-- profile:start -->
 <div align="left">
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/header-dark.svg"><source media="(prefers-color-scheme: light)" srcset="./assets/header-light.svg"><img src="./assets/header-dark.svg" alt="Kidus Mesfin Mekuria — Software engineer building full-stack applications and systems software. Python, TypeScript, Kotlin, C++, Addis Ababa." width="100%"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/header-dark.svg"><source media="(prefers-color-scheme: light)" srcset="./assets/header-light.svg"><img src="./assets/header-dark.svg" alt="Kidus Mesfin Mekuria — Software engineer building full-stack applications and systems software. Python, TypeScript, Kotlin, C++." width="100%"></picture>
 
 &nbsp;&nbsp;&nbsp;<a href="mailto:kidusmesfin27@gmail.com"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/social-email-dark.svg"><source media="(prefers-color-scheme: light)" srcset="./assets/social-email-light.svg"><img src="./assets/social-email-dark.svg" alt="Email: kidusmesfin27@gmail.com" width="42"></picture></a>&nbsp;&nbsp;<a href="https://t.me/crosscodething"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/social-telegram-dark.svg"><source media="(prefers-color-scheme: light)" srcset="./assets/social-telegram-light.svg"><img src="./assets/social-telegram-dark.svg" alt="Telegram: t.me/crosscodething" width="42"></picture></a>&nbsp;&nbsp;<a href="https://x.com/kidus_m27"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/social-x-dark.svg"><source media="(prefers-color-scheme: light)" srcset="./assets/social-x-light.svg"><img src="./assets/social-x-dark.svg" alt="X: @kidus_m27" width="42"></picture></a>
 
