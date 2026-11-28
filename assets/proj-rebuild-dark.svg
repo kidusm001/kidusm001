@@ -3,7 +3,7 @@
   <rect x="16" y="5" width="808" height="116" rx="10" fill="#151A21"/>
   <text x="38" y="35" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="18" font-weight="650" letter-spacing="-0.3" fill="#F0F3F6">Rebuild</text>
   <text x="128" y="34.5" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="11" fill="#7D8794">kidusm001/rebuild-android</text>
-  <text x="802" y="34.5" text-anchor="end" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500" fill="#4DA694">Android · v0.5.2  ↗</text>
+  <text x="802" y="34.5" text-anchor="end" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500" fill="#4DA694">Android · v0.6.0  ↗</text>
   <text x="38" y="61" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="13.5" fill="#A8B1BC">Offline-first Android strength-training app with transactional SQLite snapshots, pure immutable state,</text>
   <text x="38" y="80" font-family="Archivo, 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="13.5" fill="#A8B1BC">additive schema migrations, and Perfetto-profiled Compose UI (193ms → 40ms tab switch).</text>
   <text x="38" y="105" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="10.8" fill="#7D8794">Kotlin · Jetpack Compose · SQLite  ·  340+ JVM/Robolectric tests</text>
